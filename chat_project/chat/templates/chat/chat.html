@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Chat Application</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        #user-list {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        #user-list li {
+            margin: 10px 0;
+        }
+
+        #user-list button {
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+        }
+
+        #user-list button:hover {
+            background-color: #0056b3;
+        }
+
+        #chat-log {
+            width: 100%;
+            height: 300px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            overflow-y: auto;
+            font-family: monospace;
+            resize: none;
+        }
+
+        #message-input {
+            width: calc(80% - 20px);
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 10px;
+            box-sizing: border-box;
+        }
+
+        #send-button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #send-button:hover {
+            background-color: #218838;
+        }
+
+        @media (max-width: 600px) {
+            #message-input {
+                width: calc(70% - 20px);
+            }
+
+            #send-button {
+                width: calc(30% - 20px);
+            }
+        }
+    </style>
+    <script>
+        let socket = null;
+
+        function connectToChat(username) {
+    const currentUser = "{{ request.user.username }}";
+
+    if (username === currentUser) {
+        alert("Error: You cannot chat with yourself.");
+        return;
+    }
+
+    // Sort the usernames alphabetically to ensure consistent room names
+    const roomName = [username, currentUser].sort().join("_");
+
+    if (socket) {
+        socket.close();
+    }
+
+    const chatLog = document.getElementById('chat-log');
+    chatLog.value = ''; // Clear previous chat log
+    chatLog.placeholder = 'Connecting...';
+
+    socket = new WebSocket('ws://' + window.location.host + '/ws/chat/' + roomName + '/');
+
+    socket.onopen = function () {
+        chatLog.placeholder = 'Chat connected!';
+        chatLog.value = ''; // Clear placeholder after connection
+    };
+
+    socket.onmessage = function (e) {
+        const data = JSON.parse(e.data);
+        const message = `${data.sender}: ${data.message}\n`;
+        chatLog.value += message; // Append message to chat log
+        chatLog.scrollTop = chatLog.scrollHeight; // Scroll to the bottom
+    };
+
+    socket.onerror = function () {
+        alert('Error: Unable to connect to the chat. Please try again later.');
+    };
+
+    socket.onclose = function () {
+        chatLog.placeholder = 'Connection closed. Select a user to start a new chat.';
+    };
+}
+
+
+    </script>
+</head>
+
+<body>
+    <h1>Chat Application</h1>
+
+    <div>
+        <h2>Users</h2>
+        <ul id="user-list">
+            {% if users.exists %}
+            {% for user in users %}
+            <li>
+                <button onclick="connectToChat('{{ user.username }}_{{ request.user.username }}')">
+                    {{ user.username }}
+                </button>
+            </li>
+            {% endfor %}
+            {% else %}
+            <li>No users available for chat.</li>
+            {% endif %}
+        </ul>
+    </div>
+
+    <div>
+        <h2>Chat</h2>
+        <textarea id="chat-log" readonly placeholder="Select a user to start chatting."></textarea><br>
+        <textarea id="chat-log" readonly>
+            {% for message in messages %}
+                {{ message.timestamp }} - {{ message.sender.username }}: {{ message.message }}
+            {% endfor %}
+        </textarea>
+        <input id="message-input" type="text" placeholder="Type your message here..." />
+        <button id="send-button" onclick="sendMessage()">Send</button>
+    </div>
+</body>
+
+</html>
